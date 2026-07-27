@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetFiltersBtn = document.getElementById('resetFiltersBtn');
     const visibleCount = document.getElementById('visibleCount');
     const selectedCount = document.getElementById('selectedCount');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
     const batchTweetBtn = document.getElementById('batchTweetBtn');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
@@ -48,6 +49,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Listeners
     refreshBtn.addEventListener('click', () => fetchNotes(true));
+
+    // Export CSV Handler
+    exportCsvBtn.addEventListener('click', () => {
+        const notesToExport = selectedNoteIds.size > 0 
+            ? allNotes.filter(n => selectedNoteIds.has(n.id))
+            : getFilteredNotes();
+        
+        if (notesToExport.length === 0) {
+            showToast('No notes available to export', 'error');
+            return;
+        }
+        
+        let csvContent = 'Date,Category,Summary,Link\n';
+        notesToExport.forEach(n => {
+            const safeDate = `"${(n.date_title || '').replace(/"/g, '""')}"`;
+            const safeCat = `"${(n.category || '').replace(/"/g, '""')}"`;
+            const safeText = `"${(n.plain_text || '').replace(/"/g, '""')}"`;
+            const safeLink = `"${(n.link || '').replace(/"/g, '""')}"`;
+            csvContent += `${safeDate},${safeCat},${safeText},${safeLink}\n`;
+        });
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `bigquery_release_notes_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showToast(`Exported ${notesToExport.length} release note(s) to CSV!`, 'success');
+    });
 
     searchInput.addEventListener('input', (e) => {
         searchQuery = e.target.value.toLowerCase().trim();
@@ -199,6 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
                             </svg>
                             <span>Tweet</span>
                         </button>
+                        <button class="btn-card-action" data-action="copy-text" data-id="${note.id}">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            </svg>
+                            <span>Copy Text</span>
+                        </button>
                         <button class="btn-card-action" data-action="copy" data-link="${note.link}">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -207,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span>Copy Link</span>
                         </button>
                         <a href="${note.link}" target="_blank" rel="noopener noreferrer" class="btn-card-action" style="text-decoration: none;">
-                            <span>Read Docs</span>
+                            <span>Docs</span>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
                                 <polyline points="15 3 21 3 21 9"></polyline>
@@ -242,13 +282,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const action = btn.dataset.action;
+                    const note = allNotes.find(n => n.id === id);
+                    
                     if (action === 'tweet') {
-                        const note = allNotes.find(n => n.id === id);
                         openTweetModal(note);
+                    } else if (action === 'copy-text') {
+                        if (note) {
+                            const fullCopyText = `${note.date_title} [${note.category}]: ${note.plain_text}\nLink: ${note.link}`;
+                            copyToClipboard(fullCopyText);
+                            showToast('Release note text copied to clipboard!', 'success');
+                        }
                     } else if (action === 'copy') {
                         const link = btn.dataset.link;
                         copyToClipboard(link);
-                        showToast('Link copied to clipboard!', 'info');
+                        showToast('Direct link copied to clipboard!', 'info');
                     }
                 });
             });
