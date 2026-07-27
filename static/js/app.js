@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeCategory = 'ALL';
     let searchQuery = '';
     let sortOrder = 'newest';
+    let dateFilterHorizon = 'all'; // all, 7days, 30days, 90days
     let activeNoteForModal = null;
     let activeTemplateStyle = 'quick';
 
@@ -21,6 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearSearchBtn = document.getElementById('clearSearchBtn');
     const categoryPills = document.getElementById('categoryPills');
     const sortSelect = document.getElementById('sortSelect');
+    const dateFilterSelect = document.getElementById('dateFilterSelect');
     const notesGrid = document.getElementById('notesGrid');
     const emptyState = document.getElementById('emptyState');
     const resetFiltersBtn = document.getElementById('resetFiltersBtn');
@@ -30,6 +32,45 @@ document.addEventListener('DOMContentLoaded', () => {
     const batchTweetBtn = document.getElementById('batchTweetBtn');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
+
+    // Offline / Online Detection
+    window.addEventListener('online', () => showToast('Back online! Feed connected.', 'success'));
+    window.addEventListener('offline', () => showToast('Offline mode. Displaying cached release notes.', 'error'));
+
+    // Keyboard Shortcuts
+    document.addEventListener('keydown', (e) => {
+        const isEditing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+        if (e.key === '/' && !isEditing) {
+            e.preventDefault();
+            searchInput.focus();
+            searchInput.select();
+        } else if (e.key === 'Escape') {
+            if (tweetModal.classList.contains('active')) {
+                tweetModal.classList.remove('active');
+            }
+        } else if ((e.key === 'r' || e.key === 'R') && !isEditing) {
+            e.preventDefault();
+            fetchNotes(true);
+        }
+    });
+
+    // Date Range Filter Handler
+    if (dateFilterSelect) {
+        dateFilterSelect.addEventListener('change', (e) => {
+            dateFilterHorizon = e.target.value;
+            renderNotes();
+        });
+    }
+
+    // Suggested Chips Handler in Empty State
+    document.querySelectorAll('.btn-suggested').forEach(btn => {
+        btn.addEventListener('click', () => {
+            searchInput.value = btn.dataset.query;
+            searchQuery = btn.dataset.query.toLowerCase().trim();
+            clearSearchBtn.hidden = false;
+            renderNotes();
+        });
+    });
 
     // Theme Initialization
     const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -155,6 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
         searchQuery = '';
         clearSearchBtn.hidden = true;
         activeCategory = 'ALL';
+        dateFilterHorizon = 'all';
+        if (dateFilterSelect) dateFilterSelect.value = 'all';
         categoryPills.querySelectorAll('.pill').forEach(p => {
             p.classList.toggle('active', p.dataset.category === 'ALL');
         });
@@ -178,6 +221,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const selectedNotes = allNotes.filter(n => selectedNoteIds.has(n.id));
         openTweetModal(selectedNotes);
     });
+
+    // Helper: Parse Date Title or ISO to Date Object
+    function parseNoteDate(note) {
+        if (note.updated_iso) {
+            const d = new Date(note.updated_iso);
+            if (!isNaN(d.getTime())) return d;
+        }
+        if (note.date_title) {
+            const d = new Date(note.date_title);
+            if (!isNaN(d.getTime())) return d;
+        }
+        return new Date();
+    }
+
+    // Helper: Highlight Search Terms in HTML
+    function highlightSearchTerms(htmlStr, query) {
+        if (!query || !htmlStr) return htmlStr;
+        const regex = new RegExp(`(${query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'gi');
+        return htmlStr.replace(regex, '<mark class="highlight">$1</mark>');
+    }
 
     // Fetch API
     async function fetchNotes(forceRefresh = false) {
@@ -227,13 +290,25 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getFilteredNotes() {
+        const now = new Date();
         return allNotes.filter(note => {
             const matchesCat = activeCategory === 'ALL' || note.category === activeCategory;
             const matchesSearch = !searchQuery || 
                 note.date_title.toLowerCase().includes(searchQuery) ||
                 note.category.toLowerCase().includes(searchQuery) ||
                 note.plain_text.toLowerCase().includes(searchQuery);
-            return matchesCat && matchesSearch;
+            
+            // Date horizon filter
+            let matchesDate = true;
+            if (dateFilterHorizon !== 'all') {
+                const noteDate = parseNoteDate(note);
+                const diffDays = Math.floor((now - noteDate) / (1000 * 60 * 60 * 24));
+                if (dateFilterHorizon === '7days') matchesDate = diffDays <= 7;
+                else if (dateFilterHorizon === '30days') matchesDate = diffDays <= 30;
+                else if (dateFilterHorizon === '90days') matchesDate = diffDays <= 90;
+            }
+
+            return matchesCat && matchesSearch && matchesDate;
         }).sort((a, b) => {
             return sortOrder === 'newest' ? b.id.localeCompare(a.id, undefined, {numeric: true}) : a.id.localeCompare(b.id, undefined, {numeric: true});
         });
@@ -253,6 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notesGrid.innerHTML = filtered.map(note => {
             const isSelected = selectedNoteIds.has(note.id);
+            const contentHtml = searchQuery ? highlightSearchTerms(note.content_html, searchQuery) : note.content_html;
             return `
                 <div class="note-card ${isSelected ? 'selected' : ''}" data-id="${note.id}">
                     <div class="card-top">
@@ -263,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                     </div>
                     <div class="card-body">
-                        ${note.content_html}
+                        ${contentHtml}
                     </div>
                     <div class="card-actions">
                         <button class="btn-card-action btn-card-tweet" data-action="tweet" data-id="${note.id}">
@@ -278,6 +354,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                             </svg>
                             <span>Copy Text</span>
+                        </button>
+                        <button class="btn-card-action" data-action="copy-md" data-id="${note.id}">
+                            <span>Copy MD</span>
                         </button>
                         <button class="btn-card-action" data-action="copy" data-link="${note.link}">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -331,6 +410,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             const fullCopyText = `${note.date_title} [${note.category}]: ${note.plain_text}\nLink: ${note.link}`;
                             copyToClipboard(fullCopyText);
                             showToast('Release note text copied to clipboard!', 'success');
+                        }
+                    } else if (action === 'copy-md') {
+                        if (note) {
+                            const mdText = `## [BigQuery ${note.category}] ${note.date_title}\n\n${note.plain_text}\n\n[Read Google Cloud Docs](${note.link})`;
+                            copyToClipboard(mdText);
+                            showToast('Formatted Markdown copied to clipboard!', 'success');
                         }
                     } else if (action === 'copy') {
                         const link = btn.dataset.link;

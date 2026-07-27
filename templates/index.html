@@ -59,13 +59,13 @@
         </header>
 
         <!-- Controls Toolbar -->
-        <div class="controls-card">
+        <div class="controls-card" id="controlsCard">
             <div class="search-box">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input type="text" id="searchInput" placeholder="Search BigQuery updates (e.g. Iceberg, SQL, ODBC, tags)...">
+                <input type="text" id="searchInput" placeholder="Search BigQuery updates (e.g. Iceberg, SQL, ODBC, tags)... [Press '/' to focus]">
                 <button class="btn-clear" id="clearSearchBtn" hidden>&times;</button>
             </div>
 
@@ -78,6 +78,13 @@
                 </div>
 
                 <div class="view-options">
+                    <select id="dateFilterSelect" class="select-input" title="Filter by date horizon">
+                        <option value="all">All Time</option>
+                        <option value="7days">Last 7 Days</option>
+                        <option value="30days">Last 30 Days</option>
+                        <option value="90days">Last 90 Days</option>
+                    </select>
+
                     <select id="sortSelect" class="select-input">
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
@@ -124,8 +131,14 @@
             <div class="empty-state" id="emptyState" hidden>
                 <div class="empty-icon">🔍</div>
                 <h3>No release notes match your search</h3>
-                <p>Try clearing filters or searching for another keyword like "partition", "ICEBERG", or "ODBC".</p>
-                <button class="btn btn-primary" id="resetFiltersBtn">Reset Filters</button>
+                <p>Try clearing your filters or try one of these suggested topics:</p>
+                <div class="suggested-chips">
+                    <button class="btn-suggested" data-query="Iceberg">Iceberg</button>
+                    <button class="btn-suggested" data-query="partition">Partition</button>
+                    <button class="btn-suggested" data-query="ODBC">ODBC</button>
+                    <button class="btn-suggested" data-query="governance">Governance</button>
+                </div>
+                <button class="btn btn-primary" id="resetFiltersBtn" style="margin-top: 1.25rem;">Reset All Filters</button>
             </div>
         </main>
     </div>
