@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeNoteForModal = null;
     let activeTemplateStyle = 'quick';
 
+    // Theme Toggle Elements
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeLabel = document.getElementById('themeLabel');
+
     // DOM Elements
     const refreshBtn = document.getElementById('refreshBtn');
     const statusText = document.getElementById('statusText');
@@ -25,6 +30,41 @@ document.addEventListener('DOMContentLoaded', () => {
     const batchTweetBtn = document.getElementById('batchTweetBtn');
     const selectAllBtn = document.getElementById('selectAllBtn');
     const deselectAllBtn = document.getElementById('deselectAllBtn');
+
+    // Theme Initialization
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+        if (themeIcon) themeIcon.textContent = '☀️';
+        if (themeLabel) themeLabel.textContent = 'Light';
+    } else {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+        if (themeIcon) themeIcon.textContent = '🌙';
+        if (themeLabel) themeLabel.textContent = 'Dark';
+    }
+
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            const isLight = document.body.classList.contains('light-theme');
+            if (isLight) {
+                document.body.classList.remove('light-theme');
+                document.body.classList.add('dark-theme');
+                themeIcon.textContent = '🌙';
+                themeLabel.textContent = 'Dark';
+                localStorage.setItem('theme', 'dark');
+                showToast('Switched to Dark Mode', 'info');
+            } else {
+                document.body.classList.remove('dark-theme');
+                document.body.classList.add('light-theme');
+                themeIcon.textContent = '☀️';
+                themeLabel.textContent = 'Light';
+                localStorage.setItem('theme', 'light');
+                showToast('Switched to Light Mode', 'info');
+            }
+        });
+    }
 
     // Category Count Elements
     const countAll = document.getElementById('countAll');
